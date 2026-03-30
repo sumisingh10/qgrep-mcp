@@ -1,0 +1,8 @@
+{
+  "name": "qgrep-mcp",
+  "description": "Transparent indexed code search — automatically accelerates Grep on large codebases using qgrep indexes",
+  "version": "0.1.0",
+  "author": {
+    "name": "airefinery"
+  }
+}

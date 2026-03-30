@@ -1,0 +1,17 @@
+{
+  "description": "Intercepts Grep calls on large codebases and redirects to indexed search_code MCP tool",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/intercept_grep.py",
+            "timeout": 5
+          }
+        ],
+        "matcher": "Grep"
+      }
+    ]
+  }
+}

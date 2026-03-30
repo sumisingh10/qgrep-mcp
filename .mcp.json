@@ -1,0 +1,10 @@
+{
+  "qgrep-mcp": {
+    "command": "python3",
+    "args": ["-m", "qgrep_mcp"],
+    "cwd": "${CLAUDE_PLUGIN_ROOT}",
+    "env": {
+      "PYTHONPATH": "${CLAUDE_PLUGIN_ROOT}/src"
+    }
+  }
+}
