@@ -35,21 +35,43 @@ File count vs latency correlation: **0.959**. Total size vs latency: 0.024.
 
 ## Installation
 
+Three ways to use this, from most to least automated:
+
 ### Option 1: Claude Code Plugin (recommended)
 
-Installs the hook that transparently intercepts Grep on large repos + the MCP server.
+Installs the **hook** (transparently intercepts Grep on large repos) + **skill** (contextual nudge) + **MCP server** (indexed search tools). Full autopilot — Claude uses indexed search without being told.
 
 ```bash
 /plugin marketplace add sumisingh10/qgrep-mcp
 /plugin install qgrep-mcp@sumisingh10
 ```
 
-### Option 2: MCP Server Only
+### Option 2: MCP Server + Skill
+
+No hook — Claude is nudged toward `search_code` by the skill when it detects a code search task. Lighter touch than the plugin, still automatic for most searches.
 
 ```bash
-pip install qgrep-mcp  # or: pip install -e ".[dev]"
+git clone https://github.com/sumisingh10/qgrep-mcp.git
+claude --plugin-dir ./qgrep-mcp  # loads skill + MCP server, no hooks
+```
+
+Or register just the MCP server (no skill):
+
+```bash
+pip install -e ./qgrep-mcp  # or: pip install qgrep-mcp
 claude mcp add qgrep-mcp -- python -m qgrep_mcp
 ```
+
+### Option 3: MCP Server Only (manual)
+
+Just the three tools. Claude won't auto-select them unless you ask it to. Useful for scripting or explicit tool calls.
+
+```bash
+pip install -e ./qgrep-mcp
+claude mcp add qgrep-mcp -- python -m qgrep_mcp
+```
+
+Then explicitly ask Claude: *"Use the search_code tool to find X in /path/to/repo"*
 
 ### Prerequisites
 
@@ -65,17 +87,23 @@ claude mcp add qgrep-mcp -- python -m qgrep_mcp
 
 ### Plugin mode (Option 1)
 
+Two mechanisms work together to ensure Claude uses indexed search:
+
+**Hook (PreToolUse on Grep):**
 1. Claude calls Grep normally
-2. A `PreToolUse` hook intercepts, checks file count:
+2. Hook intercepts, checks file count:
    - **< 5k files** — Grep runs as normal (ripgrep is fast enough)
    - **5k-15k files** — allows first 2 Grep calls to measure latency, then redirects if slow
    - **> 15k files** — redirects immediately to `search_code` MCP tool
 3. `search_code` auto-builds a qgrep index on first call, then searches in milliseconds
 4. All subsequent searches use the index
 
-### MCP Server mode (Option 2)
+**Skill (contextual nudge):**
+- Activates when Claude's task involves searching code ("find in files", "grep for", "search the codebase", etc.)
+- Injects guidance to prefer `search_code` over built-in Grep
+- Zero overhead when not triggered — only metadata (~100 words) is always loaded
 
-Three tools are exposed:
+### MCP Server tools
 
 | Tool | Description |
 |------|-------------|
