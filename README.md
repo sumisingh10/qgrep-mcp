@@ -2,7 +2,7 @@
 
 Indexed code search MCP server + Claude Code plugin. Up to **237x faster** than ripgrep on large codebases.
 
-An amortized cost estimator decides at query time whether building a qgrep index is worth it, based on file count (which correlates r=0.96 with ripgrep latency). Works fully without qgrep installed > it's a pure enhancement over ripgrep.
+An amortized cost estimator decides at query time whether building a qgrep index is worth it, based on file count (which correlates r=0.96 with ripgrep latency). Works fully without qgrep installed. It's a pure enhancement over ripgrep.
 
 ## Benchmarks
 
