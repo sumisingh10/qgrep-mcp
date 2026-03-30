@@ -142,34 +142,71 @@ The MCP server is the portable core. The hook, skill, and agent are Claude Code-
 | Skill (`skills/code-search/SKILL.md`) | Yes (Claude plugin) | No |
 | Agent (`agents/code-search.md`) | Yes (Claude plugin) | No |
 
+> **Note:** Unlike Claude Code, most other tools don't have a built-in grep that takes priority over MCP tools. The MCP server alone may work fine without needing a hook or skill to steer the tool toward it.
+
+### Cross-tool concepts
+
+Each AI coding tool has its own version of instruction files and MCP configuration:
+
+| Concept | Claude Code | Codex CLI | Cursor | Copilot (VS Code) |
+|---------|------------|-----------|--------|-------------------|
+| Instruction file | `CLAUDE.md` | `AGENTS.md` | `.cursor/rules/*.mdc` | `.github/copilot-instructions.md` |
+| MCP config | `.mcp.json` | `~/.codex/config.toml` | Settings UI | `.vscode/mcp.json` |
+| Skills/nudges | `skills/*/SKILL.md` | `.agents/skills/*/SKILL.md` | Rules (glob-triggered) | N/A |
+| Custom agents | `agents/*.md` | N/A | N/A | N/A |
+
 ### OpenAI Codex CLI
 
 ```bash
 pip install -e ./qgrep-mcp
-codex --mcp-config ./qgrep-mcp/.mcp.json
 ```
+
+Add to `~/.codex/config.toml`:
+```toml
+[mcp_servers.qgrep-mcp]
+command = "python3"
+args = ["-m", "qgrep_mcp"]
+```
+
+Codex also supports skills in the same directory structure. You can adapt the skill prompt from [`skills/code-search/SKILL.md`](skills/code-search/SKILL.md) into `.agents/skills/qgrep-search/SKILL.md` in your project to nudge Codex toward `search_code`.
 
 ### Cursor
 
-Add to your project's `.cursor/mcp.json`:
+Add to `.cursor/mcp.json` in your project:
 ```json
 {
   "qgrep-mcp": {
     "command": "python3",
-    "args": ["-m", "qgrep_mcp"],
-    "env": { "PYTHONPATH": "/path/to/qgrep-mcp/src" }
+    "args": ["-m", "qgrep_mcp"]
+  }
+}
+```
+
+You can also create a `.cursor/rules/qgrep-search.mdc` rule to nudge Cursor toward the MCP tool. Adapt the prompt from [`skills/code-search/SKILL.md`](skills/code-search/SKILL.md).
+
+### GitHub Copilot (VS Code)
+
+Add to `.vscode/mcp.json`:
+```json
+{
+  "servers": {
+    "qgrep-mcp": {
+      "command": "python3",
+      "args": ["-m", "qgrep_mcp"]
+    }
   }
 }
 ```
 
 ### Any MCP-compatible client
 
-The server runs over stdio:
+Install the package, then point your client at the stdio server:
 ```bash
-PYTHONPATH=src python3 -m qgrep_mcp
+pip install -e ./qgrep-mcp
+python3 -m qgrep_mcp
 ```
 
-> **Note:** Unlike Claude Code, most other tools don't have a built-in grep that takes priority over MCP tools. The MCP server alone may work fine without needing a hook or skill to steer the tool toward it. Test with your client to confirm.
+All tools listed above require `pip install -e ./qgrep-mcp` first so `python3 -m qgrep_mcp` resolves without needing a `PYTHONPATH` override.
 
 ## Running tests
 
