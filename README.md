@@ -37,13 +37,18 @@ File count vs latency correlation: **0.959**. Total size vs latency: 0.024.
 
 Four options, from most to least automated. Pick the one that fits your workflow:
 
-### Option 1: Full Plugin (hook + skill + agent + MCP server)
+### Option 1: Hook + MCP Server (hard redirect)
 
-The hard route. Installs everything: the **hook** transparently intercepts Grep on large repos, the **skill** nudges Claude contextually, the **agent** delegates search tasks, and the **MCP server** provides the indexed search tools. Claude will use indexed search automatically with zero user intervention.
+The fully automatic route. The **hook** intercepts every Grep call and redirects to `search_code` when it detects a large codebase. Claude doesn't need to be nudged or told anything; the hook handles it transparently.
 
 ```bash
-/plugin marketplace add sumisingh10/qgrep-mcp
-/plugin install qgrep-mcp@sumisingh10
+git clone https://github.com/sumisingh10/qgrep-mcp.git
+claude --plugin-dir ./qgrep-mcp
+```
+
+Then strip the skill and agent (the hook makes them redundant):
+```bash
+rm -rf ./qgrep-mcp/skills/ ./qgrep-mcp/agents/
 ```
 
 **How the hook works:**
@@ -66,9 +71,9 @@ git clone https://github.com/sumisingh10/qgrep-mcp.git
 claude --plugin-dir ./qgrep-mcp
 ```
 
-Then remove the hook if you don't want it:
+Then strip the hook and agent:
 ```bash
-rm -rf ./qgrep-mcp/hooks/
+rm -rf ./qgrep-mcp/hooks/ ./qgrep-mcp/agents/
 ```
 
 ### Option 3: Agent + MCP Server (delegated search)
