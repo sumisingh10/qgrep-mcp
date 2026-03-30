@@ -35,43 +35,27 @@ File count vs latency correlation: **0.959**. Total size vs latency: 0.024.
 
 ## Installation
 
-Three ways to use this, from most to least automated:
+Two ways to install, from most to least automated:
 
 ### Option 1: Claude Code Plugin (recommended)
 
-Installs the **hook** (transparently intercepts Grep on large repos) + **skill** (contextual nudge) + **MCP server** (indexed search tools). Full autopilot — Claude uses indexed search without being told.
+Installs everything — **hook** (transparently intercepts Grep on large repos) + **skill** (contextual nudge) + **agent** (delegated search) + **MCP server** (indexed search tools). Full autopilot.
 
 ```bash
 /plugin marketplace add sumisingh10/qgrep-mcp
 /plugin install qgrep-mcp@sumisingh10
 ```
 
-### Option 2: MCP Server + Skill
+### Option 2: Plugin without hooks
 
-No hook — Claude is nudged toward `search_code` by the skill when it detects a code search task. Lighter touch than the plugin, still automatic for most searches.
+Loads the **skill**, **agent**, and **MCP server** but no hook. Claude is nudged toward `search_code` by the skill and can delegate to the `code-search` agent — but built-in Grep is not intercepted.
 
 ```bash
 git clone https://github.com/sumisingh10/qgrep-mcp.git
-claude --plugin-dir ./qgrep-mcp  # loads skill + MCP server, no hooks
+claude --plugin-dir ./qgrep-mcp
 ```
 
-Or register just the MCP server (no skill):
-
-```bash
-pip install -e ./qgrep-mcp  # or: pip install qgrep-mcp
-claude mcp add qgrep-mcp -- python -m qgrep_mcp
-```
-
-### Option 3: MCP Server Only (manual)
-
-Just the three tools. Claude won't auto-select them unless you ask it to. Useful for scripting or explicit tool calls.
-
-```bash
-pip install -e ./qgrep-mcp
-claude mcp add qgrep-mcp -- python -m qgrep_mcp
-```
-
-Then explicitly ask Claude: *"Use the search_code tool to find X in /path/to/repo"*
+> **Note:** The MCP server alone is not enough — Claude will ignore it in favor of built-in Grep. You need at least the skill or hook to make Claude use indexed search.
 
 ### Prerequisites
 
@@ -102,6 +86,15 @@ Two mechanisms work together to ensure Claude uses indexed search:
 - Activates when Claude's task involves searching code ("find in files", "grep for", "search the codebase", etc.)
 - Injects guidance to prefer `search_code` over built-in Grep
 - Zero overhead when not triggered — only metadata (~100 words) is always loaded
+
+**Agent (`code-search`):**
+- A specialized subagent that only has access to the MCP search tools + Read + Glob (no built-in Grep)
+- Claude can delegate search-heavy tasks to this agent, which uses `search_code` exclusively
+- Useful for exploratory tasks across large codebases — the agent runs multiple indexed searches in parallel
+
+### Plugin without hooks (Option 2)
+
+The **skill** nudges Claude toward `search_code`, and the **agent** can be spawned for delegated search tasks. Built-in Grep is not intercepted, so Claude may still use it for simple searches — but the skill and agent ensure indexed search is used for heavier workloads.
 
 ### MCP Server tools
 
