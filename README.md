@@ -66,6 +66,8 @@ Loads the **skill** and **MCP server** but no hook. When Claude's task involves 
 
 Zero overhead when the skill isn't triggered: only metadata (~100 words) is always loaded, the full body is injected only when relevant.
 
+The skill prompt lives at [`skills/code-search/SKILL.md`](skills/code-search/SKILL.md). You can customize the trigger phrases or tool guidance there.
+
 ```bash
 git clone https://github.com/sumisingh10/qgrep-mcp.git
 claude --plugin-dir ./qgrep-mcp
@@ -81,6 +83,8 @@ rm -rf ./qgrep-mcp/hooks/ ./qgrep-mcp/agents/
 Loads the **agent** and **MCP server**. Claude can spawn the `code-search` agent for search-heavy tasks. The agent only has access to `search_code`, `build_search_index`, `search_estimate`, `Read`, and `Glob` (no built-in Grep), so it always uses indexed search.
 
 Useful for exploratory tasks across large codebases where you want search delegated to a subagent that runs multiple indexed queries in parallel.
+
+The agent definition lives at [`agents/code-search.md`](agents/code-search.md). You can adjust the tool list, model, or instructions there.
 
 ```bash
 git clone https://github.com/sumisingh10/qgrep-mcp.git
@@ -126,6 +130,46 @@ The estimator handles backend selection:
 - Large repos (> 15k files): build index immediately, use qgrep
 - Gray zone (5k-15k): collect latency baselines, index if rg > 1s average
 - Features qgrep can't handle (context lines, glob filters): always use ripgrep
+
+## Using with other AI coding tools
+
+The MCP server is the portable core. The hook, skill, and agent are Claude Code-specific steering mechanisms, but the server itself works with any MCP-compatible client.
+
+| Layer | Claude-specific? | Portable? |
+|-------|-----------------|-----------|
+| MCP Server (`search_code`, etc.) | No | Any MCP client |
+| Hook (`hooks/intercept_grep.py`) | Yes (PreToolUse) | No |
+| Skill (`skills/code-search/SKILL.md`) | Yes (Claude plugin) | No |
+| Agent (`agents/code-search.md`) | Yes (Claude plugin) | No |
+
+### OpenAI Codex CLI
+
+```bash
+pip install -e ./qgrep-mcp
+codex --mcp-config ./qgrep-mcp/.mcp.json
+```
+
+### Cursor
+
+Add to your project's `.cursor/mcp.json`:
+```json
+{
+  "qgrep-mcp": {
+    "command": "python3",
+    "args": ["-m", "qgrep_mcp"],
+    "env": { "PYTHONPATH": "/path/to/qgrep-mcp/src" }
+  }
+}
+```
+
+### Any MCP-compatible client
+
+The server runs over stdio:
+```bash
+PYTHONPATH=src python3 -m qgrep_mcp
+```
+
+> **Note:** Unlike Claude Code, most other tools don't have a built-in grep that takes priority over MCP tools. The MCP server alone may work fine without needing a hook or skill to steer the tool toward it. Test with your client to confirm.
 
 ## Running tests
 
