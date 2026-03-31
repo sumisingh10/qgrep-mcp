@@ -13,14 +13,7 @@ AI coding tools ship with ripgrep or similar linear-scan search. This works fine
 
 An AI agent doing exploratory work might run 20-50 searches in a single session. At 3s each, that's 1-2.5 minutes of just waiting for grep. With an index, the same searches complete in ~0.2s total.
 
-**Why not just fix it upstream?** The models powering these tools (Claude Opus 4.6, GPT-4.1/o3, Gemini 2.5 Pro) are post-trained on curated tool-call trajectories via RLHF/RLAIF. During this process, the model learns *which* tool to reach for given a task. When it's trained on thousands of (prompt, Grep call, result) examples, "use Grep for code search" gets baked into the weights. The coding tools themselves are wrappers:
-
-- **Claude Code** runs Claude Opus/Sonnet with a system prompt defining Grep, Glob, Read, etc.
-- **Codex CLI** runs o3/GPT-4.1 with its own built-in tool set
-- **Cursor** lets users pick between Claude, GPT-4.1, Gemini, but the tool-use preferences come from each model's post-training
-- **Copilot** uses GPT-4o/Claude Sonnet with VS Code's tool definitions
-
-Users can't modify system prompts, and changing tool preferences in the model requires a post-training iteration (days to weeks per cycle, but only the model provider can do it). Even when an MCP tool like `search_code` is registered alongside built-in Grep, the model defaults to what it was trained on. We tested this directly: Claude Code ignores `search_code` 100% of the time when only the MCP server is present, with no steering mechanism.
+**Why not just fix it upstream?** The models behind these coding tools are post-trained to use specific built-in tools like Grep and file search. Tool preferences get baked into the model weights during post-training, and system prompts reinforce them further by defining the available tool set. Users can't modify either. Even when an MCP tool like `search_code` is registered alongside built-in Grep, the model defaults to what it was post-trained on. We tested this directly: Claude Code ignores `search_code` 100% of the time when only the MCP server is present, with no steering mechanism.
 
 **This project bridges that gap** by working at the layer users can control: hooks intercept tool calls before they execute, skills inject context that nudges model behavior at inference time, and agents constrain tool access so indexed search is the only option. No post-training needed, no system prompt changes, no waiting for upstream fixes.
 
