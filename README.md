@@ -8,13 +8,13 @@ An amortized cost estimator decides at query time whether building a qgrep index
 
 AI coding tools ship with ripgrep or similar linear-scan search. This works fine on small repos, but breaks down on large codebases:
 
-| Repository | Files | Avg ripgrep latency | 20 searches |
-|-----------|-------|-------------------|-------------|
-| [home-assistant/core](https://github.com/home-assistant/core) | 24,718 | ~28s | ~9 min |
-| [rust-lang/rust](https://github.com/rust-lang/rust) | 58,547 | ~60s | ~20 min |
-| [torvalds/linux](https://github.com/torvalds/linux) | 92,920 | ~92s | ~31 min |
+| Repository | Files | ripgrep (per search) | qgrep (per search) |
+|-----------|-------|---------------------|-------------------|
+| [home-assistant/core](https://github.com/home-assistant/core) | 24,718 | ~28s | ~0.034s |
+| [rust-lang/rust](https://github.com/rust-lang/rust) | 58,547 | ~60s | ~0.034s |
+| [torvalds/linux](https://github.com/torvalds/linux) | 92,920 | ~92s | ~0.161s |
 
-An AI agent doing exploratory work easily runs 20-50 searches per session. With an index, the same searches complete in milliseconds.
+Each search blocks the agent's reasoning until it returns. Even with async execution, ripgrep saturates disk I/O scanning the same files repeatedly. An indexed search returns in milliseconds regardless of repo size.
 
 **Why not just fix it upstream?** The models behind these coding tools are post-trained to use specific built-in tools like Grep and file search. Tool preferences get baked into the model weights during post-training, and system prompts reinforce them further by defining the available tool set. Users can't modify either. Even when an MCP tool like `search_code` is registered alongside built-in Grep, the model defaults to what it was post-trained on. We tested this directly: Claude Code ignores `search_code` 100% of the time when only the MCP server is present, with no steering mechanism.
 
