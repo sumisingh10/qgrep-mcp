@@ -260,7 +260,6 @@ pytest tests/ -v
 
 26 tests covering the estimator, search orchestrator, index management, and hook logic.
 
-## Contributors
+## Acknowledgments
 
-- [Michael Sklar](https://github.com/) - Helped shape the core idea of using a runtime harness for index abstraction rather than relying on post-training alone
-- [Derek Feriancek](https://github.com/) - Collaborated on the design and served as a sounding board throughout development
+Thanks to Michael Sklar and Derek Feriancek for helping shape the idea of index abstraction through a runtime harness rather than relying on post-training alone.
