@@ -84,14 +84,16 @@ claude --plugin-dir ./qgrep-mcp
 
 The skill and agent are also included but have no effect when the hook is active. They're harmless to leave in place.
 
-**How the hook works:**
-1. Claude calls Grep normally
-2. Hook intercepts and checks file count:
-   - **< 5k files** → Grep runs as normal (ripgrep is fast enough even on cold cache)
-   - **5k-15k files** → allows first 2 Grep calls to collect latency baselines, then redirects if slow
-   - **> 15k files** → redirects immediately to `search_code` MCP tool
-3. `search_code` auto-builds a qgrep index on first call, then searches in milliseconds
-4. All subsequent searches use the index
+**How the hooks work:**
+
+A **PreToolUse** hook intercepts Grep before it runs and decides whether to redirect:
+- **< 5k files** → Grep runs as normal (ripgrep is fast enough even on cold cache)
+- **5k-15k files** → allows first 2 Grep calls to collect latency baselines, then redirects if slow
+- **> 15k files** → redirects immediately to `search_code` MCP tool
+
+A **PostToolUse** hook runs after Grep completes and records the observed latency into the shared stats file. This feeds the estimator real timing data for smarter gray zone decisions without waiting for MCP tool calls.
+
+On first redirect, `search_code` auto-builds a qgrep index, then all subsequent searches use it.
 
 ### Option 2: MCP Server + CLAUDE.md (manual nudge)
 
@@ -174,6 +176,8 @@ The estimator handles backend selection:
 - Gray zone (5k-15k): collects latency baselines over the first 2 searches, indexes if ripgrep is consistently slow
 - Features qgrep can't handle (context lines, glob filters): always use ripgrep
 
+Indexes are maintained automatically. Stale indexes (where source files have been modified since the last build) are detected and rebuilt before searching. On server startup, previously-indexed repos are scanned and any stale indexes are rebuilt in the background so the first search of a new session hits a fresh index.
+
 ## Using with other AI coding tools
 
 The MCP server is the portable core. The hook, skill, and agent are Claude Code-specific steering mechanisms, but the server itself works with any MCP-compatible client.
@@ -181,7 +185,8 @@ The MCP server is the portable core. The hook, skill, and agent are Claude Code-
 | Layer | Claude-specific? | Portable? |
 |-------|-----------------|-----------|
 | MCP Server (`search_code`, etc.) | No | Any MCP client |
-| Hook (`hooks/intercept_grep.py`) | Yes (PreToolUse) | No |
+| PreToolUse hook (`hooks/intercept_grep.py`) | Yes | No |
+| PostToolUse hook (`hooks/record_grep_latency.py`) | Yes | No |
 | Skill (`skills/code-search/SKILL.md`) | Yes (Claude plugin) | No |
 | Agent (`agents/code-search.md`) | Yes (Claude plugin) | No |
 
