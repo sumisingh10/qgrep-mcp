@@ -10,6 +10,13 @@ from .config import repo_hash
 
 @dataclass
 class RepoStats:
+    """Per-repository search latency statistics and metadata.
+
+    Tracks a sliding window of latency measurements for both ripgrep and qgrep
+    backends, along with file count and index build time. Used by the estimator
+    to decide which backend to recommend.
+    """
+
     rg_latencies: list[float] = field(default_factory=list)
     qgrep_latencies: list[float] = field(default_factory=list)
     file_count: int = 0
@@ -17,11 +24,13 @@ class RepoStats:
     last_updated: float = 0.0
 
     def avg_rg(self) -> float:
+        """Return the average ripgrep latency, or 0.0 if no samples."""
         if not self.rg_latencies:
             return 0.0
         return sum(self.rg_latencies) / len(self.rg_latencies)
 
     def avg_qgrep(self) -> float:
+        """Return the average qgrep latency, or 0.0 if no samples."""
         if not self.qgrep_latencies:
             return 0.0
         return sum(self.qgrep_latencies) / len(self.qgrep_latencies)
@@ -29,6 +38,15 @@ class RepoStats:
 
 @dataclass
 class Recommendation:
+    """A backend recommendation produced by the cost estimator.
+
+    Attributes:
+        action: One of "use_ripgrep", "use_qgrep", or "build_and_use_qgrep".
+        confidence: One of "high", "medium", or "low".
+        reasoning: Human-readable explanation of why this action was chosen.
+        stats: Dictionary of current stats (file count, latencies, etc.).
+    """
+
     action: str  # "use_ripgrep" | "use_qgrep" | "build_and_use_qgrep"
     confidence: str  # "high" | "medium" | "low"
     reasoning: str
@@ -46,6 +64,7 @@ class CostEstimator:
     # --- Persistence ---
 
     def _load(self) -> None:
+        """Load persisted stats from disk, if available."""
         if config.STATS_FILE.exists():
             try:
                 raw = json.loads(config.STATS_FILE.read_text())
@@ -61,6 +80,7 @@ class CostEstimator:
                 self._all_stats = {}
 
     def _save(self) -> None:
+        """Atomically persist all stats to disk (write-to-tmp then os.replace)."""
         config.CACHE_DIR.mkdir(parents=True, exist_ok=True)
         data = {}
         for key, st in self._all_stats.items():
@@ -78,12 +98,14 @@ class CostEstimator:
     # --- Recording ---
 
     def _get_stats(self, path: str) -> RepoStats:
+        """Get or create the RepoStats entry for a given repo path."""
         h = repo_hash(path)
         if h not in self._all_stats:
             self._all_stats[h] = RepoStats()
         return self._all_stats[h]
 
     def record_rg(self, path: str, latency: float) -> None:
+        """Record a ripgrep search latency measurement."""
         st = self._get_stats(path)
         st.rg_latencies.append(latency)
         st.rg_latencies = st.rg_latencies[-config.LATENCY_WINDOW:]
@@ -92,6 +114,7 @@ class CostEstimator:
         self._save()
 
     def record_qgrep(self, path: str, latency: float) -> None:
+        """Record a qgrep search latency measurement."""
         st = self._get_stats(path)
         st.qgrep_latencies.append(latency)
         st.qgrep_latencies = st.qgrep_latencies[-config.LATENCY_WINDOW:]
@@ -100,27 +123,32 @@ class CostEstimator:
         self._save()
 
     def record_file_count(self, path: str, count: int) -> None:
+        """Update the cached file count for a repo."""
         st = self._get_stats(path)
         st.file_count = count
         st.last_updated = time.time()
         self._save()
 
     def record_build_time(self, path: str, build_time: float) -> None:
+        """Record the time it took to build the qgrep index for a repo."""
         st = self._get_stats(path)
         st.index_build_time = build_time
         st.last_updated = time.time()
         self._save()
 
     def _bump_session(self, path: str) -> None:
+        """Increment the per-session search counter for a repo."""
         h = repo_hash(path)
         self._session_searches[h] = self._session_searches.get(h, 0) + 1
 
     def session_searches(self, path: str) -> int:
+        """Return the number of searches performed this session for a repo."""
         return self._session_searches.get(repo_hash(path), 0)
 
     # --- Estimation ---
 
     def estimate(self, path: str, *, has_index: bool, has_qgrep: bool) -> Recommendation:
+        """Produce a backend recommendation based on repo size, latency history, and session state."""
         st = self._get_stats(path)
         ss = self.session_searches(path)
         fc = st.file_count

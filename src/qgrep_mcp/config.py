@@ -71,8 +71,10 @@ def find_binary(name: str) -> str | None:
 
 
 def has_qgrep() -> bool:
+    """Check whether the qgrep binary is available on the system."""
     return find_binary("qgrep") is not None
 
 
 def has_ripgrep() -> bool:
+    """Check whether the ripgrep (rg) binary is available on the system."""
     return find_binary("rg") is not None

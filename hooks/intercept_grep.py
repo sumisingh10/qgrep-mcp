@@ -30,10 +30,12 @@ GRAY_ZONE_CALLS = 2          # in the 5k-15k zone, allow this many before redire
 
 
 def repo_hash(path: str) -> str:
+    """Deterministic short hash for a repo path, used as a cache key."""
     return hashlib.sha256(os.path.realpath(path).encode()).hexdigest()[:16]
 
 
 def load_stats() -> dict:
+    """Load cached hook stats from disk, returning empty dict on failure."""
     if os.path.exists(STATS_FILE):
         try:
             with open(STATS_FILE) as f:
@@ -44,6 +46,7 @@ def load_stats() -> dict:
 
 
 def save_stats(data: dict) -> None:
+    """Atomically persist hook stats to disk."""
     os.makedirs(CACHE_DIR, exist_ok=True)
     tmp = STATS_FILE + ".tmp"
     with open(tmp, "w") as f:
@@ -131,6 +134,7 @@ def build_redirect_message(path: str, file_count: int, has_idx: bool) -> str:
 
 
 def main():
+    """Entry point for the PreToolUse hook. Reads tool call from stdin, decides whether to allow or redirect."""
     try:
         raw = sys.stdin.read()
         data = json.loads(raw)

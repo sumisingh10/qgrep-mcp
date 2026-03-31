@@ -9,7 +9,11 @@ from .config import find_binary
 
 @dataclass
 class SearchResult:
-    """Unified search result from either backend."""
+    """Unified search result returned by both ripgrep and qgrep backends.
+
+    Contains the matched lines, counts, backend name, elapsed time, and
+    whether the results were truncated due to max_results.
+    """
     matches: list[str] = field(default_factory=list)
     file_count: int = 0
     match_count: int = 0

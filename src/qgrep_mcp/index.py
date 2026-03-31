@@ -5,12 +5,19 @@ import json
 import os
 import time
 from dataclasses import asdict, dataclass
+from pathlib import Path
 
 from .config import find_binary, qgrep_project_name, repo_cache_dir
 
 
 @dataclass
 class IndexMetadata:
+    """Metadata about a qgrep index for a repository.
+
+    Persisted as JSON in the per-repo cache directory. Tracks when the index
+    was built, how long the build took, and the qgrep project name.
+    """
+
     repo_path: str
     project_name: str
     created_at: float = 0.0
@@ -18,11 +25,13 @@ class IndexMetadata:
     file_count: int = 0
 
     def save(self, path: str) -> None:
+        """Persist this metadata to the cache directory for the given repo path."""
         meta_file = repo_cache_dir(path) / "index_meta.json"
         meta_file.write_text(json.dumps(asdict(self), indent=2))
 
     @classmethod
     def load(cls, path: str) -> "IndexMetadata | None":
+        """Load metadata from disk. Returns None if missing or corrupted."""
         meta_file = repo_cache_dir(path) / "index_meta.json"
         if not meta_file.exists():
             return None
@@ -36,6 +45,38 @@ class IndexMetadata:
 def has_index(path: str) -> bool:
     """Check if an index exists for the given path."""
     return IndexMetadata.load(path) is not None
+
+
+def is_index_stale(path: str, sample_size: int = 100) -> bool:
+    """Check if files have been modified since the index was built.
+
+    Samples up to `sample_size` files and checks if any have a modification
+    time newer than the index build time. This is a heuristic, not exhaustive.
+    """
+    meta = IndexMetadata.load(path)
+    if meta is None or meta.created_at == 0.0:
+        return False  # No index to be stale
+
+    index_time = meta.created_at
+    checked = 0
+    try:
+        for root, _dirs, files in os.walk(path):
+            # Skip .git directories
+            if "/.git" in root or root.endswith("/.git"):
+                continue
+            for f in files:
+                filepath = os.path.join(root, f)
+                try:
+                    if os.path.getmtime(filepath) > index_time:
+                        return True
+                except OSError:
+                    continue
+                checked += 1
+                if checked >= sample_size:
+                    return False
+    except OSError:
+        return False
+    return False
 
 
 async def _run_qgrep(*args: str) -> tuple[int, str, str]:

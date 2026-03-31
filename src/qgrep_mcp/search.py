@@ -4,14 +4,20 @@ import time
 
 from .config import has_qgrep
 from .estimator import CostEstimator
-from .index import build_index, has_index, qgrep_search
+from .index import build_index, has_index, is_index_stale, qgrep_search
 from .ripgrep import SearchResult, count_files, ripgrep_search
 
 
 class SearchOrchestrator:
-    """Decides which backend to use and executes searches."""
+    """Decides which backend to use and executes searches.
+
+    Uses the CostEstimator to pick between ripgrep (linear scan) and qgrep
+    (indexed search). Handles auto-rebuilding stale indexes and graceful
+    fallback to ripgrep when qgrep fails or is unavailable.
+    """
 
     def __init__(self, estimator: CostEstimator) -> None:
+        """Initialize with a CostEstimator for backend selection."""
         self.estimator = estimator
 
     async def search(
@@ -25,6 +31,12 @@ class SearchOrchestrator:
         context_lines: int = 0,
         max_results: int = 200,
     ) -> SearchResult:
+        """Execute a search, automatically selecting the best backend.
+
+        Falls back to ripgrep when qgrep is unavailable or when features like
+        glob filters or context lines are requested (which qgrep doesn't support).
+        Auto-rebuilds stale indexes before searching.
+        """
         # Ensure we have a file count
         stats = self.estimator._get_stats(path)
         if stats.file_count == 0:
@@ -35,6 +47,14 @@ class SearchOrchestrator:
         force_rg = context_lines > 0 or glob is not None or output_mode != "content"
 
         if not force_rg:
+            # Auto-rebuild stale indexes
+            idx_exists = has_index(path)
+            if idx_exists and is_index_stale(path):
+                try:
+                    await build_index(path)
+                except RuntimeError:
+                    pass  # Will fall through to ripgrep if needed
+
             rec = self.estimator.estimate(
                 path, has_index=has_index(path), has_qgrep=has_qgrep()
             )
@@ -79,6 +99,7 @@ class SearchOrchestrator:
         path: str,
         **kwargs,
     ) -> SearchResult:
+        """Run a ripgrep search and record the latency."""
         result = await ripgrep_search(pattern, path, **kwargs)
         self.estimator.record_rg(path, result.elapsed_seconds)
         return result
@@ -91,6 +112,7 @@ class SearchOrchestrator:
         case_insensitive: bool = False,
         max_results: int = 200,
     ) -> SearchResult:
+        """Run a qgrep indexed search and record the latency."""
         start = time.monotonic()
         lines = await qgrep_search(
             pattern, path,
