@@ -6,16 +6,18 @@ An amortized cost estimator decides at query time whether building a qgrep index
 
 ## Motivation
 
-AI coding assistants (Claude Code, Codex, Cursor, Copilot) all rely on ripgrep or similar linear-scan tools for code search. This works fine on small repos, but breaks down on large codebases:
+AI coding tools ship with ripgrep or similar linear-scan search. This works fine on small repos, but breaks down on large codebases:
 
 - **rust-lang/rust** (58k files): ripgrep takes ~2.9s per search
 - **Linux kernel** (80k+ files), **Chromium** (300k+ files), **Android** (500k+ files): even worse
 
 An AI agent doing exploratory work might run 20-50 searches in a single session. At 3s each, that's 1-2.5 minutes of just waiting for grep. With an index, the same searches complete in ~0.2s total.
 
-**Why not just fix it upstream?** These tools hardcode their search behavior in system prompts and built-in tool definitions. Users can't modify system prompts, and post-training models to prefer different tools requires retraining cycles that take months. Even when MCP tools are registered, models default to built-in tools because that's what they were trained on. We tested this directly: Claude Code ignores `search_code` 100% of the time when only the MCP server is registered, with no steering mechanism.
+**Why not just fix it upstream?** The underlying models (Claude, GPT-4, etc.) are post-trained with tool-use behavior that favors built-in tools like Grep and file search. Cursor, Copilot, and similar IDEs are wrappers around these models, and the tool preferences are baked into the model weights during post-training. Changing which tools a model reaches for requires retraining cycles that take months. System prompts reinforce this further by defining the built-in tool set, and users can't modify them.
 
-**This project bridges that gap** by working at the layer users can control: hooks intercept tool calls before they execute, skills inject context that nudges model behavior, and agents constrain tool access so indexed search is the only option. No model retraining needed, no system prompt changes, no waiting for upstream fixes.
+Even when an MCP tool like `search_code` is registered, the model defaults to the tools it was trained on. We tested this directly: Claude Code ignores `search_code` 100% of the time when only the MCP server is present, with no steering mechanism.
+
+**This project bridges that gap** by working at the layer users can control: hooks intercept tool calls before they execute, skills inject context that nudges model behavior at inference time, and agents constrain tool access so indexed search is the only option. No model retraining needed, no system prompt changes, no waiting for upstream fixes.
 
 ## Benchmarks
 
