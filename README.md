@@ -67,11 +67,11 @@ Tested on three real-world repos with **cold disk cache** (OS file cache cleared
 
 ### What determines search speed?
 
-File count is the dominant factor, not total file size. Across our three benchmark repos (25k, 58k, 93k files), ripgrep latency scales nearly linearly with file count. Total file size has almost no predictive value (r=0.024 in earlier warm-cache tests across rust subdirectories).
+File count is the dominant factor. Across our three benchmark repos (25k, 58k, 93k files), ripgrep latency scales nearly linearly with file count.
 
 ## Installation
 
-Four options, from most to least automated. Pick the one that fits your workflow:
+Five options, from most to least automated. Pick the one that fits your workflow:
 
 ### Option 1: Hook + MCP Server (hard redirect)
 
@@ -132,16 +132,32 @@ Then strip the hook and skill:
 rm -rf ./qgrep-mcp/hooks/ ./qgrep-mcp/skills/
 ```
 
-### Option 4: MCP Server only (not recommended)
+### Option 4: MCP Server + CLAUDE.md (manual nudge)
 
-Just the raw MCP tools. **Claude will not use these on its own.** It always prefers built-in Grep over MCP tools. This option only works if you explicitly tell Claude to use `search_code` in every prompt. Without a hook, skill, or agent to steer Claude toward indexed search, the MCP server sits unused.
+Register the MCP server and add a line to your `CLAUDE.md` telling the model to prefer `search_code` over built-in Grep. No plugin, no hook, no skill files needed.
 
 ```bash
 pip install -e ./qgrep-mcp
 claude mcp add qgrep-mcp -- python -m qgrep_mcp
 ```
 
-> **Why not standalone?** We tested this across multiple sessions. Even with the MCP server registered, Claude defaults to built-in Grep 100% of the time. You need at least one steering mechanism (hook, skill, or agent) to make indexed search actually get used.
+Then add to your project's `CLAUDE.md`:
+```markdown
+When searching code, prefer the `search_code` MCP tool over built-in Grep. It uses an indexed backend that is orders of magnitude faster on large codebases.
+```
+
+This works because `CLAUDE.md` is loaded into context at the start of every session. The same approach works with `AGENTS.md` (Codex), `.cursor/rules/*.mdc` (Cursor), or `.github/copilot-instructions.md` (Copilot).
+
+### Option 5: MCP Server only (not recommended)
+
+Just the raw MCP tools with no steering. **The model will not use these on its own.** It always prefers built-in Grep over MCP tools. This option only works if you explicitly ask for `search_code` in every prompt.
+
+```bash
+pip install -e ./qgrep-mcp
+claude mcp add qgrep-mcp -- python -m qgrep_mcp
+```
+
+> **Why not standalone?** We tested this across multiple sessions. Even with the MCP server registered, Claude defaults to built-in Grep 100% of the time. You need at least one steering mechanism to make indexed search actually get used.
 
 ### Prerequisites
 
