@@ -96,7 +96,23 @@ rm -rf ./qgrep-mcp/skills/ ./qgrep-mcp/agents/
 3. `search_code` auto-builds a qgrep index on first call, then searches in milliseconds
 4. All subsequent searches use the index
 
-### Option 2: Skill + MCP Server (soft nudge)
+### Option 2: MCP Server + CLAUDE.md (manual nudge)
+
+Register the MCP server and add a line to your `CLAUDE.md` telling the model to prefer `search_code` over built-in Grep. No plugin, no hook, no skill files needed.
+
+```bash
+pip install -e ./qgrep-mcp
+claude mcp add qgrep-mcp -- python -m qgrep_mcp
+```
+
+Then add to your project's `CLAUDE.md`:
+```markdown
+When searching code, prefer the `search_code` MCP tool over built-in Grep. It uses an indexed backend that is orders of magnitude faster on large codebases.
+```
+
+This works because `CLAUDE.md` is loaded into context at the start of every session. The same approach works with `AGENTS.md` (Codex), `.cursor/rules/*.mdc` (Cursor), or `.github/copilot-instructions.md` (Copilot).
+
+### Option 3: Skill + MCP Server (soft nudge)
 
 Loads the **skill** and **MCP server** but no hook. When Claude's task involves searching code ("find in files", "grep for", "search the codebase", etc.), the skill activates and nudges Claude toward `search_code`. Built-in Grep is not intercepted, so Claude may still use it for simple searches.
 
@@ -114,7 +130,7 @@ Then strip the hook and agent:
 rm -rf ./qgrep-mcp/hooks/ ./qgrep-mcp/agents/
 ```
 
-### Option 3: Agent + MCP Server (delegated search)
+### Option 4: Agent + MCP Server (delegated search)
 
 Loads the **agent** and **MCP server**. Claude can spawn the `code-search` agent for search-heavy tasks. The agent only has access to `search_code`, `build_search_index`, `search_estimate`, `Read`, and `Glob` (no built-in Grep), so it always uses indexed search.
 
@@ -131,22 +147,6 @@ Then strip the hook and skill:
 ```bash
 rm -rf ./qgrep-mcp/hooks/ ./qgrep-mcp/skills/
 ```
-
-### Option 4: MCP Server + CLAUDE.md (manual nudge)
-
-Register the MCP server and add a line to your `CLAUDE.md` telling the model to prefer `search_code` over built-in Grep. No plugin, no hook, no skill files needed.
-
-```bash
-pip install -e ./qgrep-mcp
-claude mcp add qgrep-mcp -- python -m qgrep_mcp
-```
-
-Then add to your project's `CLAUDE.md`:
-```markdown
-When searching code, prefer the `search_code` MCP tool over built-in Grep. It uses an indexed backend that is orders of magnitude faster on large codebases.
-```
-
-This works because `CLAUDE.md` is loaded into context at the start of every session. The same approach works with `AGENTS.md` (Codex), `.cursor/rules/*.mdc` (Cursor), or `.github/copilot-instructions.md` (Copilot).
 
 ### Option 5: MCP Server only (not recommended)
 
