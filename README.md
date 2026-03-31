@@ -67,7 +67,7 @@ Tested on three real-world repos with **cold disk cache** (OS file cache cleared
 
 ### What determines search speed?
 
-File count is the dominant factor. The correlation between file count and ripgrep latency is **0.959**. Total file size correlation: 0.024.
+File count is the dominant factor, not total file size. Across our three benchmark repos (25k, 58k, 93k files), ripgrep latency scales nearly linearly with file count. Total file size has almost no predictive value (r=0.024 in earlier warm-cache tests across rust subdirectories).
 
 ## Installation
 
