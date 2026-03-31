@@ -1,5 +1,5 @@
 {
-  "description": "Intercepts Grep calls on large codebases and redirects to indexed search_code MCP tool",
+  "description": "Intercepts Grep calls on large codebases and records latency for smarter backend decisions",
   "hooks": {
     "PreToolUse": [
       {
@@ -7,6 +7,18 @@
           {
             "type": "command",
             "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/intercept_grep.py",
+            "timeout": 5
+          }
+        ],
+        "matcher": "Grep"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/record_grep_latency.py",
             "timeout": 5
           }
         ],

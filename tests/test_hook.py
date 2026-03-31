@@ -1,4 +1,4 @@
-"""Tests for the PreToolUse Grep intercept hook."""
+"""Tests for the PreToolUse Grep intercept hook and PostToolUse latency recorder."""
 
 import json
 import os
@@ -10,6 +10,9 @@ import pytest
 
 HOOK_SCRIPT = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "hooks", "intercept_grep.py"
+)
+LATENCY_HOOK_SCRIPT = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "hooks", "record_grep_latency.py"
 )
 
 
@@ -84,3 +87,108 @@ class TestInterceptGrep:
         )
         assert rc == 2
         assert "search_code" in stderr
+
+
+def run_latency_hook(
+    tool_input: dict,
+    tool_result: dict,
+    tool_name: str = "Grep",
+    env_override: dict | None = None,
+) -> tuple[int, str, str]:
+    """Run the PostToolUse latency hook with given input."""
+    payload = json.dumps({
+        "session_id": "test-session",
+        "tool_name": tool_name,
+        "tool_input": tool_input,
+        "tool_result": tool_result,
+    })
+    env = os.environ.copy()
+    if env_override:
+        env.update(env_override)
+    proc = subprocess.run(
+        [sys.executable, LATENCY_HOOK_SCRIPT],
+        input=payload,
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=15,
+    )
+    return proc.returncode, proc.stdout, proc.stderr
+
+
+class TestRecordGrepLatency:
+    """Tests for the PostToolUse latency recording hook."""
+
+    def test_non_grep_ignored(self):
+        """Non-Grep tools are ignored."""
+        rc, _, _ = run_latency_hook(
+            {"pattern": "foo", "path": "/tmp"},
+            {"duration_seconds": 1.5},
+            tool_name="Read",
+        )
+        assert rc == 0
+
+    def test_records_latency(self, tmp_path):
+        """Grep latency is recorded into stats.json."""
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir()
+
+        # Create a small test directory
+        test_dir = tmp_path / "repo"
+        test_dir.mkdir()
+        (test_dir / "a.py").write_text("hello")
+
+        env = {"QGREP_MCP_CACHE": str(cache_dir)}
+        rc, _, _ = run_latency_hook(
+            {"pattern": "hello", "path": str(test_dir)},
+            {"duration_seconds": 2.5},
+            env_override=env,
+        )
+        assert rc == 0
+
+        # Verify stats were written
+        stats_file = cache_dir / "stats.json"
+        assert stats_file.exists()
+        stats = json.loads(stats_file.read_text())
+        # Find the entry (we don't know the exact hash, but there should be one)
+        assert len(stats) == 1
+        entry = list(stats.values())[0]
+        assert 2.5 in entry["rg_latencies"]
+
+    def test_missing_duration_ignored(self, tmp_path):
+        """If no duration is provided, the hook exits cleanly."""
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir()
+        test_dir = tmp_path / "repo"
+        test_dir.mkdir()
+
+        env = {"QGREP_MCP_CACHE": str(cache_dir)}
+        rc, _, _ = run_latency_hook(
+            {"pattern": "hello", "path": str(test_dir)},
+            {},  # No duration
+            env_override=env,
+        )
+        assert rc == 0
+        # No stats file should be created
+        assert not (cache_dir / "stats.json").exists()
+
+    def test_latency_window_capped(self, tmp_path):
+        """Latency window is capped at LATENCY_WINDOW entries."""
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir()
+        test_dir = tmp_path / "repo"
+        test_dir.mkdir()
+        (test_dir / "a.py").write_text("hello")
+
+        env = {"QGREP_MCP_CACHE": str(cache_dir)}
+        # Record 25 latencies
+        for i in range(25):
+            run_latency_hook(
+                {"pattern": "hello", "path": str(test_dir)},
+                {"duration_seconds": float(i)},
+                env_override=env,
+            )
+
+        stats = json.loads((cache_dir / "stats.json").read_text())
+        entry = list(stats.values())[0]
+        assert len(entry["rg_latencies"]) == 20  # Capped at LATENCY_WINDOW
