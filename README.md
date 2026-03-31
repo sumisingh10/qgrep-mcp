@@ -1,6 +1,6 @@
 # qgrep-mcp
 
-Indexed code search MCP server + Claude Code plugin. Up to **237x faster** than ripgrep on large codebases.
+Indexed code search MCP server + Claude Code plugin. Up to **1,750x faster** than ripgrep on large codebases.
 
 An amortized cost estimator decides at query time whether building a qgrep index is worth it, based on file count (which correlates r=0.96 with ripgrep latency). Works fully without qgrep installed. It's a pure enhancement over ripgrep.
 
@@ -8,10 +8,13 @@ An amortized cost estimator decides at query time whether building a qgrep index
 
 AI coding tools ship with ripgrep or similar linear-scan search. This works fine on small repos, but breaks down on large codebases:
 
-- **rust-lang/rust** (58k files): ripgrep takes ~2.9s per search
-- **Linux kernel** (80k+ files), **Chromium** (300k+ files), **Android** (500k+ files): even worse
+| Repository | Files | Avg ripgrep latency | 20 searches |
+|-----------|-------|-------------------|-------------|
+| [home-assistant/core](https://github.com/home-assistant/core) | 24,718 | ~28s | ~9 min |
+| [rust-lang/rust](https://github.com/rust-lang/rust) | 58,547 | ~60s | ~20 min |
+| [torvalds/linux](https://github.com/torvalds/linux) | 92,920 | ~92s | ~31 min |
 
-An AI agent doing exploratory work might run 20-50 searches in a single session. At 3s each, that's 1-2.5 minutes of just waiting for grep. With an index, the same searches complete in ~0.2s total.
+An AI agent doing exploratory work easily runs 20-50 searches per session. With an index, the same searches complete in milliseconds.
 
 **Why not just fix it upstream?** The models behind these coding tools are post-trained to use specific built-in tools like Grep and file search. Tool preferences get baked into the model weights during post-training, and system prompts reinforce them further by defining the available tool set. Users can't modify either. Even when an MCP tool like `search_code` is registered alongside built-in Grep, the model defaults to what it was post-trained on. We tested this directly: Claude Code ignores `search_code` 100% of the time when only the MCP server is present, with no steering mechanism.
 
@@ -19,32 +22,43 @@ An AI agent doing exploratory work might run 20-50 searches in a single session.
 
 ## Benchmarks
 
-Tested on [rust-lang/rust](https://github.com/rust-lang/rust) (58,534 files):
+Tested on three real-world repos (cold disk cache, single run per query):
+
+| Repository | Files | Avg ripgrep | Avg qgrep | Speedup | Index build |
+|-----------|-------|-------------|-----------|---------|-------------|
+| [home-assistant/core](https://github.com/home-assistant/core) | 24,718 | 27.6s | 0.034s | **812x** | 93s |
+| [rust-lang/rust](https://github.com/rust-lang/rust) | 58,547 | 59.6s | 0.034s | **1,753x** | 83s |
+| [torvalds/linux](https://github.com/torvalds/linux) | 92,920 | 92.4s | 0.161s | **574x** | 236s |
+
+### Detailed results
+
+**rust-lang/rust (58,547 files):**
 
 | Query | ripgrep | qgrep | Speedup |
 |-------|---------|-------|---------|
-| `unsafe impl` | 2.88s | 0.010s | 277x |
-| `TODO\|FIXME\|HACK` | 2.92s | 0.018s | 161x |
-| `pub async fn` | 2.88s | 0.011s | 267x |
-| `impl Iterator for` | 2.86s | 0.012s | 243x |
-| `fn main` | 3.02s | 0.011s | 288x |
-| **Average** | **2.91s** | **0.012s** | **237x** |
+| `TODO\|FIXME` | 59.65s | 0.055s | 1,085x |
+| `fn main` | 59.66s | 0.027s | 2,210x |
+| `unsafe impl` | 59.40s | 0.018s | 3,300x |
 
-Index build time: **7.4s** (one-time cost, pays for itself after ~3 searches)
+**Linux kernel (92,920 files):**
+
+| Query | ripgrep | qgrep | Speedup |
+|-------|---------|-------|---------|
+| `TODO\|FIXME` | 65.04s | 0.312s | 208x |
+| `int main` | 107.97s | 0.074s | 1,459x |
+| `static void` | 104.30s | 0.098s | 1,064x |
+
+**home-assistant/core (24,718 files):**
+
+| Query | ripgrep | qgrep | Speedup |
+|-------|---------|-------|---------|
+| `TODO\|FIXME` | 36.53s | 0.043s | 850x |
+| `async def` | 22.96s | 0.036s | 638x |
+| `class.*:` | 23.30s | 0.024s | 971x |
 
 ### What determines search speed?
 
-File count is the dominant factor, not total file size:
-
-| Directory | Files | Size (MB) | rg latency |
-|-----------|-------|-----------|------------|
-| rust/compiler | 2,804 | 31.6 | 0.16s |
-| rust/src/tools | 11,107 | 44.7 | 0.59s |
-| rust/src | 12,384 | 68.9 | 2.35s |
-| rust/tests | 41,119 | 49.7 | 10.4s |
-| rust (full) | 58,534 | 194.4 | 25.8s |
-
-File count vs latency correlation: **0.959**. Total size vs latency: 0.024.
+File count is the dominant factor. The correlation between file count and ripgrep latency is **0.959**. Total file size correlation: 0.024.
 
 ## Installation
 
