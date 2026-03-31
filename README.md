@@ -1,6 +1,6 @@
 # qgrep-mcp
 
-Indexed code search MCP server + Claude Code plugin. Up to **1,750x faster** than ripgrep on large codebases.
+Indexed code search MCP server + Claude Code plugin. Orders of magnitude faster than ripgrep on large codebases.
 
 An amortized cost estimator decides at query time whether building a qgrep index is worth it, based on file count (which correlates r=0.96 with ripgrep latency). Works fully without qgrep installed. It's a pure enhancement over ripgrep.
 
@@ -22,7 +22,7 @@ An AI agent doing exploratory work easily runs 20-50 searches per session. With 
 
 ## Benchmarks
 
-Tested on three real-world repos (cold disk cache, single run per query):
+Tested on three real-world repos with **cold disk cache** (OS file cache cleared between runs, simulating a fresh session where the AI agent hasn't touched these files yet). This reflects real-world conditions since agents start fresh sessions and the OS evicts cached file data over time:
 
 | Repository | Files | Avg ripgrep | Avg qgrep | Speedup | Index build |
 |-----------|-------|-------------|-----------|---------|-------------|
