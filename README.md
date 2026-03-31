@@ -4,6 +4,19 @@ Indexed code search MCP server + Claude Code plugin. Up to **237x faster** than 
 
 An amortized cost estimator decides at query time whether building a qgrep index is worth it, based on file count (which correlates r=0.96 with ripgrep latency). Works fully without qgrep installed. It's a pure enhancement over ripgrep.
 
+## Motivation
+
+AI coding assistants (Claude Code, Codex, Cursor, Copilot) all rely on ripgrep or similar linear-scan tools for code search. This works fine on small repos, but breaks down on large codebases:
+
+- **rust-lang/rust** (58k files): ripgrep takes ~2.9s per search
+- **Linux kernel** (80k+ files), **Chromium** (300k+ files), **Android** (500k+ files): even worse
+
+An AI agent doing exploratory work might run 20-50 searches in a single session. At 3s each, that's 1-2.5 minutes of just waiting for grep. With an index, the same searches complete in ~0.2s total.
+
+**Why not just fix it upstream?** These tools hardcode their search behavior in system prompts and built-in tool definitions. Users can't modify system prompts, and post-training models to prefer different tools requires retraining cycles that take months. Even when MCP tools are registered, models default to built-in tools because that's what they were trained on. We tested this directly: Claude Code ignores `search_code` 100% of the time when only the MCP server is registered, with no steering mechanism.
+
+**This project bridges that gap** by working at the layer users can control: hooks intercept tool calls before they execute, skills inject context that nudges model behavior, and agents constrain tool access so indexed search is the only option. No model retraining needed, no system prompt changes, no waiting for upstream fixes.
+
 ## Benchmarks
 
 Tested on [rust-lang/rust](https://github.com/rust-lang/rust) (58,534 files):
