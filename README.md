@@ -82,10 +82,7 @@ git clone https://github.com/sumisingh10/qgrep-mcp.git
 claude --plugin-dir ./qgrep-mcp
 ```
 
-Then strip the skill and agent (the hook makes them redundant):
-```bash
-rm -rf ./qgrep-mcp/skills/ ./qgrep-mcp/agents/
-```
+The skill and agent are also included but have no effect when the hook is active. They're harmless to leave in place.
 
 **How the hook works:**
 1. Claude calls Grep normally
@@ -125,10 +122,7 @@ git clone https://github.com/sumisingh10/qgrep-mcp.git
 claude --plugin-dir ./qgrep-mcp
 ```
 
-Then strip the hook and agent:
-```bash
-rm -rf ./qgrep-mcp/hooks/ ./qgrep-mcp/agents/
-```
+The hook and agent are also included but unused by this option. They're harmless to leave in place.
 
 ### Option 4: Agent + MCP Server (delegated search)
 
@@ -143,10 +137,7 @@ git clone https://github.com/sumisingh10/qgrep-mcp.git
 claude --plugin-dir ./qgrep-mcp
 ```
 
-Then strip the hook and skill:
-```bash
-rm -rf ./qgrep-mcp/hooks/ ./qgrep-mcp/skills/
-```
+The hook and skill are also included but unused by this option. They're harmless to leave in place.
 
 ### Option 5: MCP Server only (not recommended)
 
