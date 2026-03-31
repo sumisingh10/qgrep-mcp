@@ -258,7 +258,15 @@ pip install -e ".[dev]"
 pytest tests/ -v
 ```
 
-26 tests covering the estimator, search orchestrator, index management, and hook logic.
+39 tests covering the estimator, search orchestrator, index management, warming, and hook logic.
+
+## Future: Semantic search
+
+The current system handles exact pattern matching (regex). A natural extension is **semantic search** — finding code by meaning rather than exact text. For example, searching for "authentication middleware" would find functions like `verify_jwt_token()` or `check_session_cookie()` even though those strings don't contain the search terms.
+
+This could work by embedding code chunks at index build time (using a local model like `nomic-embed-text` or an API), storing vectors alongside the qgrep index, and adding a `semantic_search` tool that queries the vector store. The estimator would route between regex search and semantic search based on the query type.
+
+This is not currently implemented but is a logical next step for the project.
 
 ## Acknowledgments
 
