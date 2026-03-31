@@ -259,3 +259,7 @@ pytest tests/ -v
 ```
 
 26 tests covering the estimator, search orchestrator, index management, and hook logic.
+
+## License
+
+[MIT](LICENSE)
