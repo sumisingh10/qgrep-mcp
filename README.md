@@ -39,6 +39,9 @@ Tested on three real-world repos with **cold disk cache** (OS file cache cleared
 | `TODO\|FIXME` | 59.65s | 0.055s | 1,085x |
 | `fn main` | 59.66s | 0.027s | 2,210x |
 | `unsafe impl` | 59.40s | 0.018s | 3,300x |
+| `fn\s+\w+\(.*Result<` | 36.85s | 0.037s | 990x |
+| `pub\s+(unsafe\s+)?fn\s+\w+` | 34.89s | 0.041s | 861x |
+| `#\[derive\(.*Clone.*\)\]` | 33.83s | 0.027s | 1,242x |
 
 **Linux kernel (92,920 files):**
 
@@ -47,6 +50,9 @@ Tested on three real-world repos with **cold disk cache** (OS file cache cleared
 | `TODO\|FIXME` | 65.04s | 0.312s | 208x |
 | `int main` | 107.97s | 0.074s | 1,459x |
 | `static void` | 104.30s | 0.098s | 1,064x |
+| `static\s+const\s+struct\s+file_operations` | 49.85s | 0.258s | 193x |
+| `pr_err\(\|pr_warn\(\|pr_info\(` | 47.66s | 0.225s | 212x |
+| `MODULE_LICENSE\(` | 51.55s | 0.215s | 240x |
 
 **home-assistant/core (24,718 files):**
 
@@ -55,6 +61,9 @@ Tested on three real-world repos with **cold disk cache** (OS file cache cleared
 | `TODO\|FIXME` | 36.53s | 0.043s | 850x |
 | `async def` | 22.96s | 0.036s | 638x |
 | `class.*:` | 23.30s | 0.024s | 971x |
+| `async\s+def\s+async_setup_entry` | 23.19s | 0.027s | 867x |
+| `raise\s+HomeAssistantError` | 3.43s | 0.026s | 132x |
+| `CONF_\w+\s*=\s*"` | 1.27s | 0.017s | 74x |
 
 ### What determines search speed?
 
@@ -81,8 +90,8 @@ rm -rf ./qgrep-mcp/skills/ ./qgrep-mcp/agents/
 **How the hook works:**
 1. Claude calls Grep normally
 2. Hook intercepts and checks file count:
-   - **< 5k files** → Grep runs as normal (ripgrep is fast enough)
-   - **5k-15k files** → allows first 2 Grep calls to measure latency, then redirects if slow
+   - **< 5k files** → Grep runs as normal (ripgrep is fast enough even on cold cache)
+   - **5k-15k files** → allows first 2 Grep calls to collect latency baselines, then redirects if slow
    - **> 15k files** → redirects immediately to `search_code` MCP tool
 3. `search_code` auto-builds a qgrep index on first call, then searches in milliseconds
 4. All subsequent searches use the index
@@ -153,9 +162,9 @@ claude mcp add qgrep-mcp -- python -m qgrep_mcp
 | `search_estimate` | Get indexing recommendation + stats for a directory |
 
 The estimator handles backend selection:
-- Small repos (< 5k files): always ripgrep
+- Small repos (< 5k files): always ripgrep (fast enough even on cold cache)
 - Large repos (> 15k files): build index immediately, use qgrep
-- Gray zone (5k-15k): collect latency baselines, index if rg > 1s average
+- Gray zone (5k-15k): collects latency baselines over the first 2 searches, indexes if ripgrep is consistently slow
 - Features qgrep can't handle (context lines, glob filters): always use ripgrep
 
 ## Using with other AI coding tools
