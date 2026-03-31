@@ -262,4 +262,4 @@ pytest tests/ -v
 
 ## Acknowledgments
 
-Thanks to Michael Sklar and Derek Feriancek for helping me work through the core problem: retraining models to prefer new tools is not feasible for everyone, and users can't modify system prompts. A runtime harness that sits between the model and its built-in tools is one abstracted solution to that.
+Thanks to [Michael Sklar](https://github.com/mikesklar) and [Derek Feriancek](https://github.com/iCameiSawiCoded) for helping me work through the core problem: retraining models to prefer new tools is not feasible for everyone, and users can't modify system prompts. A runtime harness that sits between the model and its built-in tools is one abstracted solution to that.
