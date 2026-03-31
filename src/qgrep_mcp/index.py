@@ -33,6 +33,11 @@ class IndexMetadata:
     def load(cls, path: str) -> "IndexMetadata | None":
         """Load metadata from disk. Returns None if missing or corrupted."""
         meta_file = repo_cache_dir(path) / "index_meta.json"
+        return cls.load_from_file(meta_file)
+
+    @classmethod
+    def load_from_file(cls, meta_file: Path) -> "IndexMetadata | None":
+        """Load metadata from a specific file path. Returns None if missing or corrupted."""
         if not meta_file.exists():
             return None
         try:

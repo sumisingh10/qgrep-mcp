@@ -1,15 +1,74 @@
-"""FastMCP server with tool definitions."""
+"""FastMCP server with tool definitions and pre-session index warming.
 
+On startup, scans the cache directory for previously-indexed repos and rebuilds
+any with stale indexes in the background. This way the first search of a new
+session hits a fresh index instead of triggering a synchronous rebuild.
+"""
+
+import asyncio
+import logging
 import os
+from contextlib import asynccontextmanager
 
 from mcp.server.fastmcp import FastMCP
 
-from .config import has_qgrep
+from .config import CACHE_DIR, has_qgrep
 from .estimator import CostEstimator
-from .index import build_index, delete_index, has_index, index_status
+from .index import (
+    IndexMetadata,
+    build_index,
+    delete_index,
+    has_index,
+    index_status,
+    is_index_stale,
+)
 from .search import SearchOrchestrator
 
-mcp = FastMCP("qgrep-mcp")
+logger = logging.getLogger(__name__)
+
+
+async def warm_stale_indexes() -> None:
+    """Scan cached index metadata and rebuild any stale indexes.
+
+    Iterates over all per-repo cache directories, loads their metadata,
+    and rebuilds indexes whose source files have been modified since the
+    last build. Errors are logged and silently skipped.
+    """
+    if not CACHE_DIR.exists():
+        return
+    for entry in CACHE_DIR.iterdir():
+        if not entry.is_dir():
+            continue
+        meta_file = entry / "index_meta.json"
+        if not meta_file.exists():
+            continue
+        meta = IndexMetadata.load_from_file(meta_file)
+        if meta is None:
+            continue
+        repo_path = meta.repo_path
+        if not os.path.isdir(repo_path):
+            continue
+        if is_index_stale(repo_path):
+            try:
+                logger.info("Warming stale index for %s", repo_path)
+                await build_index(repo_path)
+            except RuntimeError as e:
+                logger.warning("Failed to warm index for %s: %s", repo_path, e)
+
+
+@asynccontextmanager
+async def lifespan(app: FastMCP):
+    """Server lifespan: warm stale indexes on startup."""
+    task = asyncio.create_task(warm_stale_indexes())
+    yield {}
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+
+
+mcp = FastMCP("qgrep-mcp", lifespan=lifespan)
 
 estimator = CostEstimator()
 orchestrator = SearchOrchestrator(estimator)

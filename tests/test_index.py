@@ -1,8 +1,10 @@
-"""Tests for index metadata management."""
+"""Tests for index metadata management, staleness detection, and pre-session warming."""
 
 import json
 import os
 import time
+from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -124,3 +126,104 @@ class TestStaleIndex:
         (git_dir / "HEAD").write_text("ref: refs/heads/main")
 
         assert is_index_stale(str(repo)) is False
+
+
+class TestLoadFromFile:
+    """Tests for IndexMetadata.load_from_file."""
+
+    def test_load_from_file(self, tmp_cache):
+        """load_from_file loads metadata from an explicit file path."""
+        meta = IndexMetadata(
+            repo_path="/test/repo",
+            project_name="qmcp_test",
+            created_at=1000.0,
+            build_time_seconds=2.0,
+        )
+        meta.save("/test/repo")
+        from qgrep_mcp.config import repo_cache_dir
+        meta_file = repo_cache_dir("/test/repo") / "index_meta.json"
+        loaded = IndexMetadata.load_from_file(meta_file)
+        assert loaded is not None
+        assert loaded.project_name == "qmcp_test"
+
+    def test_load_from_file_missing(self, tmp_cache):
+        """load_from_file returns None for a missing file."""
+        loaded = IndexMetadata.load_from_file(Path("/nonexistent/meta.json"))
+        assert loaded is None
+
+
+class TestPreSessionWarming:
+    """Tests for the warm_stale_indexes startup routine."""
+
+    @pytest.mark.asyncio
+    async def test_warm_rebuilds_stale(self, tmp_path, tmp_cache):
+        """warm_stale_indexes rebuilds a stale index."""
+        from qgrep_mcp.server import warm_stale_indexes
+
+        # Create a repo with files
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / "a.py").write_text("hello")
+
+        # Save a stale index (created_at in the past)
+        meta = IndexMetadata(
+            repo_path=str(repo),
+            project_name="test",
+            created_at=time.time() - 100,
+            build_time_seconds=1.0,
+        )
+        meta.save(str(repo))
+
+        # Touch a file to make it stale
+        time.sleep(0.05)
+        (repo / "a.py").write_text("modified")
+
+        # Mock build_index to avoid needing qgrep
+        with patch("qgrep_mcp.server.build_index", new_callable=AsyncMock) as mock_build:
+            mock_build.return_value = IndexMetadata(
+                repo_path=str(repo),
+                project_name="test",
+                created_at=time.time(),
+                build_time_seconds=0.5,
+            )
+            await warm_stale_indexes()
+            mock_build.assert_called_once_with(str(repo))
+
+    @pytest.mark.asyncio
+    async def test_warm_skips_fresh(self, tmp_path, tmp_cache):
+        """warm_stale_indexes does not rebuild a fresh index."""
+        from qgrep_mcp.server import warm_stale_indexes
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / "a.py").write_text("hello")
+        time.sleep(0.05)
+
+        meta = IndexMetadata(
+            repo_path=str(repo),
+            project_name="test",
+            created_at=time.time(),
+            build_time_seconds=1.0,
+        )
+        meta.save(str(repo))
+
+        with patch("qgrep_mcp.server.build_index", new_callable=AsyncMock) as mock_build:
+            await warm_stale_indexes()
+            mock_build.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_warm_skips_missing_repo(self, tmp_cache):
+        """warm_stale_indexes skips repos whose paths no longer exist."""
+        from qgrep_mcp.server import warm_stale_indexes
+
+        meta = IndexMetadata(
+            repo_path="/nonexistent/repo/path",
+            project_name="test",
+            created_at=time.time() - 100,
+            build_time_seconds=1.0,
+        )
+        meta.save("/nonexistent/repo/path")
+
+        with patch("qgrep_mcp.server.build_index", new_callable=AsyncMock) as mock_build:
+            await warm_stale_indexes()
+            mock_build.assert_not_called()
