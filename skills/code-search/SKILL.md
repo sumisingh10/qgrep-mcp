@@ -12,7 +12,7 @@ This skill provides fast indexed code search via the `search_code` MCP tool, whi
 
 Prefer the `search_code` MCP tool over the built-in Grep tool when searching file contents across a directory tree. The `search_code` tool automatically selects the fastest backend:
 
-- On large repos (15k+ files), it builds and uses a qgrep index — searches complete in ~10ms instead of ~3-25s
+- On large repos (15k+ files), it builds and uses a qgrep index. Searches complete in ~10ms instead of ~3-25s
 - On small repos (< 5k files), it transparently falls back to ripgrep
 - In the gray zone (5k-15k files), it measures ripgrep latency and indexes if beneficial
 
@@ -79,4 +79,4 @@ The `search_code` tool handles backend selection automatically:
 3. For glob filters or context lines, use ripgrep (qgrep limitation)
 4. For small repos, use ripgrep directly (fast enough)
 
-No manual index management is needed for typical usage — just call `search_code` and it handles the rest.
+No manual index management is needed for typical usage. Just call `search_code` and it handles the rest.
