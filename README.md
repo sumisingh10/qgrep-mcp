@@ -185,6 +185,7 @@ The MCP server is the portable core. The hook, skill, and agent are Claude Code-
 | Layer | Claude-specific? | Portable? |
 |-------|-----------------|-----------|
 | MCP Server (`search_code`, etc.) | No | Any MCP client |
+| REST API (`--http` mode) | No | Any HTTP client |
 | PreToolUse hook (`hooks/intercept_grep.py`) | Yes | No |
 | PostToolUse hook (`hooks/record_grep_latency.py`) | Yes | No |
 | Skill (`skills/code-search/SKILL.md`) | Yes (Claude plugin) | No |
@@ -256,6 +257,43 @@ python3 -m qgrep_mcp
 
 All tools listed above require `pip install -e ./qgrep-mcp` first so `python3 -m qgrep_mcp` resolves without needing a `PYTHONPATH` override.
 
+## REST API
+
+The same search engine is also available as a plain HTTP API, for cases where MCP is overkill or unsupported. This does not replace the MCP server — it's a simpler interface that exposes the search, indexing, and estimation endpoints over HTTP. No tool discovery, no protocol negotiation, just `curl`.
+
+```bash
+pip install -e ./qgrep-mcp
+python -m qgrep_mcp --http           # localhost:8080
+python -m qgrep_mcp --http --port 9000
+```
+
+**Endpoints:**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/search` | Search code (pattern, path, glob, case_insensitive, etc.) |
+| `POST` | `/index` | Manage indexes (action: build/rebuild/status/delete, path) |
+| `GET` | `/estimate?path=` | Get indexing recommendation for a directory |
+| `GET` | `/health` | Server health check |
+
+**Example:**
+```bash
+# Search for "async def" in a repo
+curl -s localhost:8080/search \
+  -H "Content-Type: application/json" \
+  -d '{"pattern": "async def", "path": "/path/to/repo"}' | jq .
+
+# Check if indexing is worth it
+curl -s "localhost:8080/estimate?path=/path/to/repo" | jq .
+
+# Build an index
+curl -s localhost:8080/index \
+  -H "Content-Type: application/json" \
+  -d '{"action": "build", "path": "/path/to/repo"}' | jq .
+```
+
+Useful for CI pipelines, editor plugins, custom tooling, or any integration that just wants fast code search over HTTP.
+
 ## Running tests
 
 ```bash
@@ -263,7 +301,7 @@ pip install -e ".[dev]"
 pytest tests/ -v
 ```
 
-39 tests covering the estimator, search orchestrator, index management, warming, and hook logic.
+47 tests covering the estimator, search orchestrator, index management, warming, hooks, and REST API.
 
 ## Future: Semantic search
 
