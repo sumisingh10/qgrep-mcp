@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-qgrep-mcp = "qgrep_mcp.server:main"
+qgrep-mcp = "qgrep_mcp.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/qgrep_mcp"]
