@@ -1,6 +1,6 @@
 # qgrep-mcp
 
-Indexed code search MCP server. Improves over ripgrep on large codebases. Built for Claude Code, ports to Codex CLI, Cursor, Copilot, and any MCP-compatible client. Also available as a standalone REST API.
+Indexed code search for large codebases. Available as a **CLI tool**, **MCP server**, and **REST API**. Built for Claude Code, ports to Codex CLI, Cursor, Copilot, and any MCP-compatible client.
 
 An amortized cost estimator decides at query time whether building a qgrep index is worth it, based on file count (which correlates r=0.96 with ripgrep latency). Works fully without qgrep installed. It's a pure enhancement over ripgrep.
 
@@ -184,6 +184,7 @@ The MCP server is the portable core. The hook, skill, and agent are Claude Code-
 
 | Layer | Claude-specific? | Portable? |
 |-------|-----------------|-----------|
+| CLI (`qgrep-mcp search`, etc.) | No | Any terminal |
 | MCP Server (`search_code`, etc.) | No | Any MCP client |
 | REST API (`--http` mode) | No | Any HTTP client |
 | PreToolUse hook (`hooks/intercept_grep.py`) | Yes | No |
@@ -294,6 +295,69 @@ curl -s localhost:8080/index \
 
 Useful for CI pipelines, editor plugins, custom tooling, or any integration that just wants fast code search over HTTP.
 
+## CLI
+
+Use qgrep-mcp directly from the terminal without any server:
+
+```bash
+pip install -e ./qgrep-mcp
+```
+
+### Search
+
+```bash
+# Search current directory
+qgrep-mcp search "TODO|FIXME"
+
+# Search a specific repo with flags
+qgrep-mcp search -i -g "*.py" "async def" /path/to/repo
+
+# List matching files only
+qgrep-mcp search -l "import asyncio" .
+
+# Show context lines and stats
+qgrep-mcp search -C 3 --stats "fn main" /path/to/repo
+```
+
+All flags mirror ripgrep conventions:
+
+| Flag | Description |
+|------|-------------|
+| `-i` | Case-insensitive search |
+| `-g GLOB` | Filter files by glob (e.g. `"*.py"`, `"*.{ts,tsx}"`) |
+| `-C N` | Show N context lines around each match |
+| `-l` | List matching file paths only |
+| `-c` | Show match counts per file |
+| `-m N` | Max results (default: 200) |
+| `-o MODE` | Output mode: `content`, `files_with_matches`, `count` |
+| `--stats` | Print backend and timing info to stderr |
+
+Backend selection is automatic — the same estimator used by the MCP server picks between ripgrep and qgrep based on repo size and search history.
+
+### Index management
+
+```bash
+qgrep-mcp index build /path/to/repo    # Build a qgrep index
+qgrep-mcp index status /path/to/repo   # Check if indexed
+qgrep-mcp index rebuild /path/to/repo  # Delete and recreate
+qgrep-mcp index delete /path/to/repo   # Remove index
+```
+
+### Estimate
+
+```bash
+qgrep-mcp estimate /path/to/repo       # Human-readable recommendation
+qgrep-mcp estimate --json .            # Machine-readable JSON
+```
+
+### Start servers
+
+```bash
+qgrep-mcp serve                        # MCP server (stdio)
+qgrep-mcp serve --http                 # REST API on port 8080
+qgrep-mcp serve --http --port 9000     # REST API on custom port
+```
+
 ## Running tests
 
 ```bash
@@ -301,7 +365,7 @@ pip install -e ".[dev]"
 pytest tests/ -v
 ```
 
-47 tests covering the estimator, search orchestrator, index management, warming, hooks, and REST API.
+59 tests covering the estimator, search orchestrator, index management, warming, hooks, REST API, and CLI.
 
 ## Future: Semantic search
 
